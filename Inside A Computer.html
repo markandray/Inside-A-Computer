@@ -1,0 +1,1884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inside a Computer — An Interactive Journey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════
+     ROOT & RESET
+  ═══════════════════════════════════════════ */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:        #030b14;
+    --surface:   #071827;
+    --panel:     #0a2236;
+    --cpu:       #00ffe7;
+    --gpu:       #bf00ff;
+    --ram:       #ffcc00;
+    --storage:   #ff6b35;
+    --net:       #00c9ff;
+    --text:      #c8e6ff;
+    --muted:     #4a7a9b;
+    --white:     #f0faff;
+    --glow-cpu:  0 0 20px rgba(0,255,231,.55);
+    --glow-gpu:  0 0 20px rgba(191,0,255,.55);
+    --glow-ram:  0 0 20px rgba(255,204,0,.55);
+    --glow-sto:  0 0 20px rgba(255,107,53,.55);
+    --glow-net:  0 0 20px rgba(0,201,255,.55);
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-disp: 'Orbitron', sans-serif;
+    --font-body: 'Syne', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    cursor: none;
+    overflow-x: hidden;
+  }
+
+  /* ═══════════════════════════════════════════
+     CUSTOM CURSOR
+  ═══════════════════════════════════════════ */
+  #cursor-dot {
+    position: fixed; top: 0; left: 0; width: 8px; height: 8px;
+    background: var(--cpu); border-radius: 50%;
+    pointer-events: none; z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: background .2s;
+    box-shadow: var(--glow-cpu);
+  }
+  #cursor-ring {
+    position: fixed; top: 0; left: 0; width: 32px; height: 32px;
+    border: 1.5px solid rgba(0,255,231,.5); border-radius: 50%;
+    pointer-events: none; z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: transform .12s ease, width .2s, height .2s, border-color .2s;
+  }
+  body.hover-active #cursor-ring {
+    width: 48px; height: 48px; border-color: var(--cpu);
+  }
+
+  /* ═══════════════════════════════════════════
+     LOADING SCREEN
+  ═══════════════════════════════════════════ */
+  #loader {
+    position: fixed; inset: 0; z-index: 8888;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2rem;
+    transition: opacity .8s ease, visibility .8s;
+  }
+  #loader.hidden { opacity: 0; visibility: hidden; }
+
+  .loader-logo {
+    font-family: var(--font-disp);
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    font-weight: 900;
+    color: var(--cpu);
+    letter-spacing: .15em;
+    text-shadow: var(--glow-cpu);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
+
+  .loader-bar-wrap {
+    width: min(320px, 80vw);
+    height: 3px;
+    background: var(--surface);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .loader-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cpu), var(--gpu));
+    border-radius: 2px;
+    transition: width .05s linear;
+    box-shadow: var(--glow-cpu);
+  }
+  .loader-status {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    color: var(--muted);
+    letter-spacing: .08em;
+  }
+
+  /* ═══════════════════════════════════════════
+     NAV
+  ═══════════════════════════════════════════ */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.2rem 3rem;
+    background: rgba(3,11,20,.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,255,231,.08);
+    transition: background .3s;
+  }
+  .nav-brand {
+    font-family: var(--font-disp);
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--cpu);
+    letter-spacing: .15em;
+    text-shadow: var(--glow-cpu);
+  }
+  .nav-links {
+    display: flex; gap: 2rem; list-style: none;
+  }
+  .nav-links a {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: .1em;
+    transition: color .2s;
+    text-transform: uppercase;
+  }
+  .nav-links a:hover { color: var(--cpu); }
+
+  .nav-progress {
+    position: absolute; bottom: 0; left: 0;
+    height: 1.5px;
+    background: linear-gradient(90deg, var(--cpu), var(--gpu));
+    width: 0%;
+    transition: width .1s linear;
+    box-shadow: var(--glow-cpu);
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION SHARED
+  ═══════════════════════════════════════════ */
+  section {
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .section-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 7rem 2rem 5rem;
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity .8s ease, transform .8s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal-delay-1 { transition-delay: .15s; }
+  .reveal-delay-2 { transition-delay: .3s; }
+  .reveal-delay-3 { transition-delay: .45s; }
+  .reveal-delay-4 { transition-delay: .6s; }
+
+  /* ═══════════════════════════════════════════
+     SECTION 1 — HERO
+  ═══════════════════════════════════════════ */
+  #hero {
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    background: radial-gradient(ellipse 80% 60% at 50% 40%, #071827 0%, var(--bg) 100%);
+  }
+
+  /* Animated grid background */
+  .grid-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,255,231,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,231,.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    animation: gridShift 20s linear infinite;
+  }
+  @keyframes gridShift {
+    from { background-position: 0 0; }
+    to   { background-position: 48px 48px; }
+  }
+
+  /* Floating circuit nodes */
+  .circuit-nodes {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  }
+  .node {
+    position: absolute;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cpu);
+    box-shadow: var(--glow-cpu);
+    animation: nodeFloat linear infinite;
+    opacity: .7;
+  }
+
+  @keyframes nodeFloat {
+    0%   { transform: translateY(0) scale(1); opacity:.7; }
+    50%  { transform: translateY(-30px) scale(1.3); opacity:1; }
+    100% { transform: translateY(0) scale(1); opacity:.7; }
+  }
+
+  .hero-content { position: relative; z-index: 1; }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    color: var(--cpu);
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    animation: fadeUp .8s ease both;
+  }
+
+  .hero-title {
+    font-family: var(--font-disp);
+    font-size: clamp(2.8rem, 8vw, 6.5rem);
+    font-weight: 900;
+    line-height: .95;
+    color: var(--white);
+    text-shadow: 0 0 80px rgba(0,255,231,.3);
+    animation: fadeUp .8s .2s ease both;
+    letter-spacing: -.02em;
+  }
+  .hero-title .accent { color: var(--cpu); }
+
+  .hero-sub {
+    margin-top: 1.8rem;
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 520px;
+    margin-left: auto; margin-right: auto;
+    line-height: 1.7;
+    animation: fadeUp .8s .4s ease both;
+  }
+
+  .hero-cta {
+    margin-top: 3rem;
+    display: inline-flex; align-items: center; gap: .7rem;
+    padding: .9rem 2.2rem;
+    background: transparent;
+    border: 1px solid var(--cpu);
+    color: var(--cpu);
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: none;
+    animation: fadeUp .8s .6s ease both;
+    transition: background .25s, box-shadow .25s;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+  .hero-cta:hover {
+    background: rgba(0,255,231,.1);
+    box-shadow: var(--glow-cpu);
+  }
+
+  .hero-scroll-hint {
+    position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: .5rem;
+    font-family: var(--font-mono); font-size: .65rem;
+    color: var(--muted); letter-spacing: .2em; text-transform: uppercase;
+    animation: fadeUp 1s 1s ease both;
+  }
+  .scroll-line {
+    width: 1px; height: 48px;
+    background: linear-gradient(to bottom, var(--cpu), transparent);
+    animation: scrollLine 1.8s ease-in-out infinite;
+  }
+  @keyframes scrollLine {
+    0%   { transform: scaleY(0); transform-origin: top; }
+    50%  { transform: scaleY(1); transform-origin: top; }
+    51%  { transform: scaleY(1); transform-origin: bottom; }
+    100% { transform: scaleY(0); transform-origin: bottom; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(24px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 2 — INTRODUCTION / MOTHERBOARD
+  ═══════════════════════════════════════════ */
+  #intro {
+    background: linear-gradient(180deg, var(--bg) 0%, #040f1f 100%);
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+    align-items: center;
+  }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    color: var(--cpu);
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    display: flex; align-items: center; gap: .8rem;
+  }
+  .section-label::before {
+    content: '';
+    display: block;
+    width: 32px; height: 1px;
+    background: var(--cpu);
+    box-shadow: var(--glow-cpu);
+  }
+
+  .section-title {
+    font-family: var(--font-disp);
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 900;
+    color: var(--white);
+    line-height: 1.05;
+    margin-bottom: 1.5rem;
+    letter-spacing: -.02em;
+  }
+
+  .section-body {
+    font-size: 1rem;
+    color: var(--text);
+    line-height: 1.8;
+    opacity: .85;
+  }
+
+  /* Motherboard SVG diagram */
+  .mb-diagram {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+  }
+  .mb-svg {
+    width: 100%; height: 100%;
+    filter: drop-shadow(0 0 24px rgba(0,255,231,.18));
+  }
+  .mb-chip {
+    cursor: none;
+    transition: filter .3s;
+  }
+  .mb-chip:hover { filter: brightness(1.5); }
+
+  /* Pulse rings on chip */
+  .pulse-ring {
+    animation: ringPulse 2.4s ease-out infinite;
+    transform-origin: center;
+  }
+  @keyframes ringPulse {
+    0%   { r: 12; opacity: .8; }
+    100% { r: 28; opacity: 0; }
+  }
+
+  /* Trace animation */
+  .trace-line {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: traceFlow 3s linear infinite;
+  }
+  @keyframes traceFlow {
+    0%   { stroke-dashoffset: 200; }
+    100% { stroke-dashoffset: -200; }
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 3 — EXPLORATION (CPU, GPU, RAM)
+  ═══════════════════════════════════════════ */
+  #exploration {
+    background: #030b14;
+    padding-bottom: 0;
+  }
+
+  .exp-header {
+    text-align: center;
+    margin-bottom: 5rem;
+  }
+
+  /* Horizontal sticky scroll container */
+  .components-track-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 2rem 3rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cpu) transparent;
+  }
+  .components-track-wrap::-webkit-scrollbar { height: 3px; }
+  .components-track-wrap::-webkit-scrollbar-track { background: transparent; }
+  .components-track-wrap::-webkit-scrollbar-thumb { background: var(--cpu); border-radius: 2px; }
+
+  .components-track {
+    display: flex;
+    gap: 2rem;
+    width: max-content;
+    padding-bottom: 1rem;
+  }
+
+  .comp-card {
+    width: 340px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 4px;
+    padding: 2.5rem;
+    position: relative;
+    overflow: hidden;
+    cursor: none;
+    transition: transform .3s ease, border-color .3s;
+    clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  }
+  .comp-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  .comp-card:hover { transform: translateY(-6px); }
+
+  /* Per-component color theming */
+  .comp-card[data-comp="cpu"] { --c: var(--cpu); --glow: var(--glow-cpu); }
+  .comp-card[data-comp="gpu"] { --c: var(--gpu); --glow: var(--glow-gpu); }
+  .comp-card[data-comp="ram"] { --c: var(--ram); --glow: var(--glow-ram); }
+  .comp-card[data-comp="storage"] { --c: var(--storage); --glow: var(--glow-sto); }
+  .comp-card[data-comp="network"] { --c: var(--net); --glow: var(--glow-net); }
+
+  .comp-card:hover { border-color: var(--c); box-shadow: var(--glow); }
+
+  .comp-card::after {
+    content: attr(data-num);
+    position: absolute; top: 1.5rem; right: 1.5rem;
+    font-family: var(--font-disp);
+    font-size: 4rem;
+    font-weight: 900;
+    color: var(--c);
+    opacity: .06;
+    line-height: 1;
+  }
+
+  .comp-icon {
+    width: 52px; height: 52px;
+    margin-bottom: 1.5rem;
+  }
+
+  .comp-name {
+    font-family: var(--font-disp);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--c);
+    letter-spacing: .1em;
+    margin-bottom: .5rem;
+    text-shadow: var(--glow);
+  }
+  .comp-full {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    color: var(--muted);
+    letter-spacing: .15em;
+    margin-bottom: 1.2rem;
+    text-transform: uppercase;
+  }
+  .comp-desc {
+    font-size: .88rem;
+    line-height: 1.7;
+    color: var(--text);
+    opacity: .8;
+    margin-bottom: 1.5rem;
+  }
+
+  .comp-stats {
+    display: flex; flex-direction: column; gap: .6rem;
+  }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-mono); font-size: .7rem;
+  }
+  .stat-label { color: var(--muted); }
+  .stat-bar-wrap {
+    width: 100px;
+    height: 3px;
+    background: rgba(255,255,255,.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .stat-bar {
+    height: 100%;
+    background: var(--c);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 1.2s ease;
+    box-shadow: 0 0 6px var(--c);
+  }
+
+  /* Expand button */
+  .comp-expand-btn {
+    margin-top: 1.5rem;
+    display: flex; align-items: center; gap: .5rem;
+    background: none; border: none;
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    color: var(--c);
+    letter-spacing: .1em;
+    cursor: none;
+    padding: 0;
+    transition: gap .2s;
+  }
+  .comp-expand-btn:hover { gap: .9rem; }
+  .comp-expand-btn svg { width: 14px; height: 14px; }
+
+  /* Card modal overlay */
+  .card-modal {
+    position: fixed; inset: 0; z-index: 4000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(3,11,20,.92);
+    backdrop-filter: blur(12px);
+    opacity: 0; visibility: hidden;
+    transition: opacity .35s, visibility .35s;
+  }
+  .card-modal.open { opacity: 1; visibility: visible; }
+
+  .modal-inner {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 4px;
+    max-width: 700px;
+    width: 90%;
+    padding: 3rem;
+    position: relative;
+    transform: scale(.94);
+    transition: transform .35s ease;
+    clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+  }
+  .card-modal.open .modal-inner { transform: scale(1); }
+
+  .modal-close {
+    position: absolute; top: 1.2rem; right: 1.2rem;
+    background: none; border: none; cursor: none;
+    color: var(--muted); font-size: 1.2rem;
+    transition: color .2s;
+  }
+  .modal-close:hover { color: var(--white); }
+
+  .modal-title {
+    font-family: var(--font-disp);
+    font-size: 1.6rem;
+    font-weight: 900;
+    margin-bottom: .3rem;
+  }
+  .modal-sub {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    color: var(--muted);
+    letter-spacing: .15em;
+    margin-bottom: 1.5rem;
+  }
+  .modal-body {
+    font-size: .95rem;
+    line-height: 1.8;
+    color: var(--text);
+    opacity: .85;
+    margin-bottom: 1.5rem;
+  }
+  .modal-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .fact-item {
+    background: rgba(0,0,0,.3);
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 3px;
+    padding: 1rem;
+  }
+  .fact-key {
+    font-family: var(--font-mono);
+    font-size: .62rem;
+    color: var(--muted);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: .3rem;
+  }
+  .fact-val {
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--white);
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 4 — INSIGHT (Data Flow Visualizer)
+  ═══════════════════════════════════════════ */
+  #insight {
+    background: linear-gradient(180deg, #040f1f 0%, #020a13 100%);
+  }
+
+  .insight-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 5rem;
+    align-items: start;
+  }
+
+  .flow-diagram {
+    position: relative;
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid rgba(0,255,231,.08);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .flow-title {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    color: var(--muted);
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  .flow-svg {
+    width: 100%; height: 340px;
+    overflow: visible;
+  }
+
+  /* Data packet animation */
+  .packet {
+    animation: packetMove linear infinite;
+  }
+  @keyframes packetMove {
+    0%   { offset-distance: 0%; }
+    100% { offset-distance: 100%; }
+  }
+
+  /* Toggle buttons */
+  .toggle-row {
+    display: flex; gap: .8rem; flex-wrap: wrap;
+    margin-top: 2rem;
+  }
+  .toggle-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,.1);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    padding: .5rem 1.1rem;
+    cursor: none;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: all .2s;
+  }
+  .toggle-btn.active, .toggle-btn:hover {
+    border-color: var(--cpu);
+    color: var(--cpu);
+    background: rgba(0,255,231,.06);
+    box-shadow: var(--glow-cpu);
+  }
+
+  .insight-facts h3 {
+    font-family: var(--font-disp);
+    font-size: 1rem;
+    color: var(--white);
+    letter-spacing: .08em;
+    margin-bottom: 1rem;
+  }
+
+  .fact-list {
+    list-style: none;
+    display: flex; flex-direction: column; gap: .8rem;
+  }
+  .fact-list li {
+    display: flex; gap: 1rem; align-items: flex-start;
+    font-size: .88rem; line-height: 1.6;
+    color: var(--text); opacity: .8;
+    cursor: none;
+    padding: .8rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    transition: border-color .2s, background .2s;
+  }
+  .fact-list li:hover {
+    border-color: rgba(0,255,231,.12);
+    background: rgba(0,255,231,.03);
+    opacity: 1;
+  }
+  .fact-dot {
+    width: 7px; height: 7px; flex-shrink: 0;
+    border-radius: 50%; margin-top: .45rem;
+    background: var(--cpu);
+    box-shadow: var(--glow-cpu);
+  }
+
+  /* Speed slider */
+  .speed-control {
+    margin-top: 1.5rem;
+    padding: 1.2rem;
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 3px;
+  }
+  .speed-label {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    color: var(--muted);
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    display: flex; justify-content: space-between;
+    margin-bottom: .8rem;
+  }
+  .speed-label span { color: var(--cpu); }
+
+  input[type=range] {
+    width: 100%;
+    appearance: none;
+    background: rgba(255,255,255,.06);
+    height: 3px;
+    border-radius: 2px;
+    outline: none;
+    cursor: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--cpu);
+    box-shadow: var(--glow-cpu);
+    cursor: none;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 5 — CONCLUSION
+  ═══════════════════════════════════════════ */
+  #conclusion {
+    background: radial-gradient(ellipse 100% 80% at 50% 100%, #071827 0%, var(--bg) 60%);
+    display: flex; align-items: center;
+    text-align: center;
+  }
+
+  .conclusion-inner {
+    width: 100%;
+  }
+
+  .conclusion-title {
+    font-family: var(--font-disp);
+    font-size: clamp(2.2rem, 6vw, 5rem);
+    font-weight: 900;
+    color: var(--white);
+    line-height: 1;
+    margin-bottom: 1.5rem;
+    letter-spacing: -.03em;
+  }
+  .conclusion-title .line2 { color: var(--cpu); display: block; }
+
+  .conclusion-body {
+    font-size: 1rem;
+    color: var(--text);
+    opacity: .8;
+    max-width: 560px;
+    margin: 0 auto 3rem;
+    line-height: 1.8;
+  }
+
+  /* Component summary pills */
+  .summary-row {
+    display: flex; flex-wrap: wrap; gap: 1rem;
+    justify-content: center;
+    margin-bottom: 4rem;
+  }
+  .summary-pill {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .6rem 1.2rem;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 100px;
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: var(--text);
+    letter-spacing: .1em;
+    cursor: none;
+    transition: all .25s;
+  }
+  .summary-pill:hover {
+    border-color: var(--c);
+    color: var(--c);
+    box-shadow: var(--glow);
+  }
+  .pill-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: var(--glow);
+  }
+
+  /* Stats counter row */
+  .stat-counters {
+    display: flex; justify-content: center; gap: 4rem; flex-wrap: wrap;
+    margin-bottom: 4rem;
+  }
+  .counter-item {
+    display: flex; flex-direction: column; align-items: center; gap: .4rem;
+  }
+  .counter-num {
+    font-family: var(--font-disp);
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: var(--cpu);
+    text-shadow: var(--glow-cpu);
+  }
+  .counter-label {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    color: var(--muted);
+    letter-spacing: .15em;
+    text-transform: uppercase;
+  }
+
+  /* Footer */
+  footer {
+    background: var(--bg);
+    border-top: 1px solid rgba(0,255,231,.06);
+    text-align: center;
+    padding: 2rem;
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    color: var(--muted);
+    letter-spacing: .1em;
+  }
+  footer span { color: var(--cpu); }
+
+  /* ═══════════════════════════════════════════
+     PARALLAX LAYERS
+  ═══════════════════════════════════════════ */
+  .parallax-layer {
+    position: absolute;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* Glow orb */
+  .orb {
+    border-radius: 50%;
+    filter: blur(90px);
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* ═══════════════════════════════════════════
+     RESPONSIVE
+  ═══════════════════════════════════════════ */
+  @media (max-width: 900px) {
+    nav { padding: 1rem 1.5rem; }
+    .nav-links { display: none; }
+    .intro-grid, .insight-grid { grid-template-columns: 1fr; gap: 3rem; }
+    .section-inner { padding: 6rem 1.5rem 4rem; }
+    .components-track-wrap { padding: 0 1.5rem 2rem; }
+    .comp-card { width: 290px; padding: 2rem; }
+    .modal-facts { grid-template-columns: 1fr; }
+    .stat-counters { gap: 2rem; }
+  }
+
+  @media (max-width: 600px) {
+    .hero-title { font-size: 2.6rem; }
+    .comp-card { width: 270px; padding: 1.6rem; }
+    .conclusion-title { font-size: 2.2rem; }
+    body { cursor: auto; }
+    #cursor-dot, #cursor-ring { display: none; }
+  }
+
+  /* ═══════════════════════════════════════════
+     HOVER OVERLAY on interactive elements
+  ═══════════════════════════════════════════ */
+  a, button, .comp-card, .fact-list li, .summary-pill, .toggle-btn, input[type=range] {
+    /* signal hover zone to cursor JS */
+  }
+</style>
+</head>
+<body>
+
+<!-- Custom Cursor -->
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+
+<!-- ─── LOADER ─── -->
+<div id="loader">
+  <div class="loader-logo">INITIALIZING SYSTEM</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loaderBar"></div></div>
+  <div class="loader-status" id="loaderStatus">Mounting hardware interfaces...</div>
+</div>
+
+<!-- ─── NAV ─── -->
+<nav id="mainNav">
+  <div class="nav-brand">INSIDE A COMPUTER</div>
+  <ul class="nav-links">
+    <li><a href="#hero">HOME</a></li>
+    <li><a href="#intro">OVERVIEW</a></li>
+    <li><a href="#exploration">COMPONENTS</a></li>
+    <li><a href="#insight">DATA FLOW</a></li>
+    <li><a href="#conclusion">CONCLUSION</a></li>
+  </ul>
+  <div class="nav-progress" id="navProgress"></div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     SECTION 1 — HERO
+═══════════════════════════════════════════ -->
+<section id="hero">
+  <div class="grid-bg"></div>
+  <div class="circuit-nodes" id="circuitNodes"></div>
+
+  <!-- Glow orbs -->
+  <div class="orb" style="width:600px;height:600px;background:rgba(0,255,231,.04);top:-100px;left:-150px;"></div>
+  <div class="orb" style="width:400px;height:400px;background:rgba(191,0,255,.04);top:20%;right:-100px;"></div>
+
+  <div class="hero-content">
+    <p class="hero-eyebrow">// Interactive Experience / Frontend Odyssey</p>
+    <h1 class="hero-title">
+      Inside<br>
+      <span class="accent">A Computer</span>
+    </h1>
+    <p class="hero-sub">An immersive journey through the silicon heart of modern computing — from the CPU's relentless calculations to the vast architecture of networks.</p>
+    <a href="#intro" class="hero-cta">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Begin Exploration
+    </a>
+  </div>
+
+  <div class="hero-scroll-hint">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SECTION 2 — INTRODUCTION
+═══════════════════════════════════════════ -->
+<section id="intro">
+  <div class="section-inner">
+    <div class="intro-grid">
+      <div>
+        <p class="section-label reveal">Introduction</p>
+        <h2 class="section-title reveal reveal-delay-1">The Motherboard:<br>Heart of the Machine</h2>
+        <p class="section-body reveal reveal-delay-2">
+          Every modern computer is a marvel of engineering — billions of transistors working in perfect harmony. At the center of it all sits the <strong>motherboard</strong>: a complex printed circuit board that connects every component and orchestrates the flow of data, power, and signals.
+        </p>
+        <br>
+        <p class="section-body reveal reveal-delay-3">
+          In this experience, you'll journey through five core components — the <strong>CPU</strong>, <strong>GPU</strong>, <strong>RAM</strong>, <strong>Storage</strong>, and <strong>Network</strong> — understanding how each one contributes to the machine's collective intelligence.
+        </p>
+      </div>
+
+      <!-- Animated Motherboard Diagram -->
+      <div class="mb-diagram reveal reveal-delay-2">
+        <svg class="mb-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+          <!-- Board background -->
+          <rect width="400" height="400" rx="8" fill="#071827"/>
+          <!-- PCB grid lines -->
+          <g stroke="rgba(0,255,231,.06)" stroke-width=".5">
+            <line x1="0" y1="80" x2="400" y2="80"/>
+            <line x1="0" y1="160" x2="400" y2="160"/>
+            <line x1="0" y1="240" x2="400" y2="240"/>
+            <line x1="0" y1="320" x2="400" y2="320"/>
+            <line x1="80" y1="0" x2="80" y2="400"/>
+            <line x1="160" y1="0" x2="160" y2="400"/>
+            <line x1="240" y1="0" x2="240" y2="400"/>
+            <line x1="320" y1="0" x2="320" y2="400"/>
+          </g>
+
+          <!-- Trace lines (data bus) -->
+          <g fill="none">
+            <!-- CPU to RAM -->
+            <path class="trace-line" d="M 150 150 L 280 150 L 280 200" stroke="rgba(0,255,231,.4)" stroke-width="1.5"/>
+            <!-- CPU to GPU -->
+            <path class="trace-line" d="M 100 180 L 60 180 L 60 280 L 120 280" stroke="rgba(191,0,255,.4)" stroke-width="1.5" style="animation-delay:0.8s"/>
+            <!-- CPU to Storage -->
+            <path class="trace-line" d="M 150 170 L 150 300 L 230 300" stroke="rgba(255,107,53,.4)" stroke-width="1.5" style="animation-delay:1.6s"/>
+            <!-- CPU to Network -->
+            <path class="trace-line" d="M 130 140 L 130 60 L 290 60 L 290 120" stroke="rgba(0,201,255,.4)" stroke-width="1.5" style="animation-delay:2.4s"/>
+          </g>
+
+          <!-- CPU (center-left) -->
+          <g class="mb-chip" data-tip="CPU">
+            <rect x="90" y="130" width="70" height="70" rx="3" fill="#0a2236" stroke="rgba(0,255,231,.6)" stroke-width="1.5"/>
+            <rect x="97" y="137" width="56" height="56" rx="2" fill="#041420"/>
+            <!-- Pin dots -->
+            <g fill="rgba(0,255,231,.5)">
+              <rect x="85" y="140" width="4" height="4" rx=".5"/>
+              <rect x="85" y="152" width="4" height="4" rx=".5"/>
+              <rect x="85" y="164" width="4" height="4" rx=".5"/>
+              <rect x="85" y="176" width="4" height="4" rx=".5"/>
+              <rect x="163" y="140" width="4" height="4" rx=".5"/>
+              <rect x="163" y="152" width="4" height="4" rx=".5"/>
+              <rect x="163" y="164" width="4" height="4" rx=".5"/>
+              <rect x="163" y="176" width="4" height="4" rx=".5"/>
+            </g>
+            <text x="125" y="165" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="9" fill="rgba(0,255,231,.9)" font-weight="700">CPU</text>
+            <!-- Pulse ring -->
+            <circle cx="125" cy="165" r="12" fill="none" stroke="rgba(0,255,231,.3)" class="pulse-ring"/>
+            <circle cx="125" cy="165" r="12" fill="none" stroke="rgba(0,255,231,.3)" class="pulse-ring" style="animation-delay:1.2s"/>
+          </g>
+
+          <!-- RAM (right) -->
+          <g class="mb-chip">
+            <rect x="260" y="180" width="90" height="30" rx="3" fill="#0a2236" stroke="rgba(255,204,0,.6)" stroke-width="1.2"/>
+            <text x="305" y="199" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="8" fill="rgba(255,204,0,.9)" font-weight="700">RAM</text>
+            <rect x="260" y="218" width="90" height="30" rx="3" fill="#0a2236" stroke="rgba(255,204,0,.4)" stroke-width="1.2"/>
+            <text x="305" y="237" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="8" fill="rgba(255,204,0,.7)" font-weight="700">RAM</text>
+          </g>
+
+          <!-- GPU (bottom-left) -->
+          <g class="mb-chip">
+            <rect x="110" y="260" width="100" height="60" rx="3" fill="#0a2236" stroke="rgba(191,0,255,.6)" stroke-width="1.5"/>
+            <rect x="116" y="266" width="88" height="48" rx="2" fill="#041420"/>
+            <text x="160" y="295" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="9" fill="rgba(191,0,255,.9)" font-weight="700">GPU</text>
+          </g>
+
+          <!-- Storage (bottom-right) -->
+          <g class="mb-chip">
+            <rect x="230" y="275" width="80" height="45" rx="3" fill="#0a2236" stroke="rgba(255,107,53,.6)" stroke-width="1.2"/>
+            <text x="270" y="303" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="8" fill="rgba(255,107,53,.9)" font-weight="700">SSD</text>
+          </g>
+
+          <!-- Network chip (top-right) -->
+          <g class="mb-chip">
+            <rect x="265" y="100" width="70" height="50" rx="3" fill="#0a2236" stroke="rgba(0,201,255,.6)" stroke-width="1.2"/>
+            <text x="300" y="129" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="8" fill="rgba(0,201,255,.9)" font-weight="700">NIC</text>
+          </g>
+
+          <!-- Data packet dots -->
+          <circle r="4" fill="#00ffe7" opacity=".9">
+            <animateMotion dur="3s" repeatCount="indefinite">
+              <mpath href="#trace-cpu-ram"/>
+            </animateMotion>
+          </circle>
+          <circle r="3" fill="#bf00ff" opacity=".9">
+            <animateMotion dur="4s" begin="1s" repeatCount="indefinite">
+              <mpath href="#trace-cpu-gpu"/>
+            </animateMotion>
+          </circle>
+          <circle r="3" fill="#ffcc00" opacity=".9">
+            <animateMotion dur="5s" begin="2s" repeatCount="indefinite">
+              <mpath href="#trace-cpu-sto"/>
+            </animateMotion>
+          </circle>
+
+          <!-- Hidden paths for animateMotion -->
+          <defs>
+            <path id="trace-cpu-ram" d="M 150 150 L 280 150 L 280 200"/>
+            <path id="trace-cpu-gpu" d="M 100 180 L 60 180 L 60 280 L 120 280"/>
+            <path id="trace-cpu-sto" d="M 150 170 L 150 300 L 230 300"/>
+          </defs>
+
+          <!-- Board label -->
+          <text x="20" y="390" font-family="'Share Tech Mono',monospace" font-size="9" fill="rgba(0,255,231,.2)">ODYSSEY-X1 MAINBOARD REV.3.2</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SECTION 3 — EXPLORATION
+═══════════════════════════════════════════ -->
+<section id="exploration">
+  <div class="section-inner">
+    <div class="exp-header">
+      <p class="section-label reveal" style="justify-content:center;">Core Components</p>
+      <h2 class="section-title reveal reveal-delay-1" style="text-align:center;">Meet the Architects</h2>
+      <p class="section-body reveal reveal-delay-2" style="text-align:center;max-width:480px;margin:0 auto;">
+        Scroll horizontally to explore each component. Click any card for a deep dive.
+      </p>
+    </div>
+  </div>
+
+  <div class="components-track-wrap reveal">
+    <div class="components-track" id="compTrack">
+
+      <!-- CPU Card -->
+      <div class="comp-card" data-comp="cpu" data-num="01" data-modal="cpu">
+        <svg class="comp-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="14" y="14" width="24" height="24" rx="2" stroke="var(--cpu)" stroke-width="1.5"/>
+          <rect x="18" y="18" width="16" height="16" rx="1" fill="rgba(0,255,231,.1)" stroke="var(--cpu)" stroke-width="1"/>
+          <g stroke="var(--cpu)" stroke-width="1.2">
+            <line x1="20" y1="14" x2="20" y2="8"/><line x1="26" y1="14" x2="26" y2="8"/><line x1="32" y1="14" x2="32" y2="8"/>
+            <line x1="20" y1="38" x2="20" y2="44"/><line x1="26" y1="38" x2="26" y2="44"/><line x1="32" y1="38" x2="32" y2="44"/>
+            <line x1="14" y1="20" x2="8" y2="20"/><line x1="14" y1="26" x2="8" y2="26"/><line x1="14" y1="32" x2="8" y2="32"/>
+            <line x1="38" y1="20" x2="44" y2="20"/><line x1="38" y1="26" x2="44" y2="26"/><line x1="38" y1="32" x2="44" y2="32"/>
+          </g>
+        </svg>
+        <div class="comp-name">CPU</div>
+        <div class="comp-full">Central Processing Unit</div>
+        <p class="comp-desc">The brain of the computer. Executes instructions, performs calculations, and manages all other components at billions of cycles per second.</p>
+        <div class="comp-stats">
+          <div class="stat-row">
+            <span class="stat-label">SPEED</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="92"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">CORES</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="75"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">POWER</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="85"></div></div>
+          </div>
+        </div>
+        <button class="comp-expand-btn" data-modal="cpu">
+          Explore
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+
+      <!-- GPU Card -->
+      <div class="comp-card" data-comp="gpu" data-num="02" data-modal="gpu">
+        <svg class="comp-icon" viewBox="0 0 52 52" fill="none">
+          <rect x="6" y="16" width="40" height="22" rx="2" stroke="var(--gpu)" stroke-width="1.5"/>
+          <rect x="10" y="20" width="14" height="14" rx="1" fill="rgba(191,0,255,.1)" stroke="var(--gpu)" stroke-width="1"/>
+          <line x1="28" y1="23" x2="42" y2="23" stroke="var(--gpu)" stroke-width="1"/>
+          <line x1="28" y1="27" x2="42" y2="27" stroke="var(--gpu)" stroke-width="1"/>
+          <line x1="28" y1="31" x2="36" y2="31" stroke="var(--gpu)" stroke-width="1"/>
+          <line x1="14" y1="38" x2="14" y2="44" stroke="var(--gpu)" stroke-width="1.2"/>
+          <line x1="20" y1="38" x2="20" y2="44" stroke="var(--gpu)" stroke-width="1.2"/>
+          <line x1="26" y1="38" x2="26" y2="44" stroke="var(--gpu)" stroke-width="1.2"/>
+          <line x1="32" y1="38" x2="32" y2="44" stroke="var(--gpu)" stroke-width="1.2"/>
+        </svg>
+        <div class="comp-name">GPU</div>
+        <div class="comp-full">Graphics Processing Unit</div>
+        <p class="comp-desc">Designed for parallel processing, the GPU handles thousands of tasks simultaneously — powering everything from gaming to AI and machine learning.</p>
+        <div class="comp-stats">
+          <div class="stat-row">
+            <span class="stat-label">PARALLEL</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="98"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">VRAM</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="80"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">RENDER</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="95"></div></div>
+          </div>
+        </div>
+        <button class="comp-expand-btn" data-modal="gpu">
+          Explore
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+
+      <!-- RAM Card -->
+      <div class="comp-card" data-comp="ram" data-num="03" data-modal="ram">
+        <svg class="comp-icon" viewBox="0 0 52 52" fill="none">
+          <rect x="6" y="18" width="40" height="16" rx="2" stroke="var(--ram)" stroke-width="1.5"/>
+          <g stroke="var(--ram)" stroke-width="1">
+            <line x1="13" y1="18" x2="13" y2="10"/><line x1="18" y1="18" x2="18" y2="10"/>
+            <line x1="23" y1="18" x2="23" y2="10"/><line x1="28" y1="18" x2="28" y2="10"/>
+            <line x1="33" y1="18" x2="33" y2="10"/><line x1="38" y1="18" x2="38" y2="10"/>
+          </g>
+          <g fill="rgba(255,204,0,.25)" stroke="var(--ram)" stroke-width=".8">
+            <rect x="10" y="21" width="6" height="10" rx="1"/>
+            <rect x="19" y="21" width="6" height="10" rx="1"/>
+            <rect x="28" y="21" width="6" height="10" rx="1"/>
+            <rect x="37" y="21" width="6" height="10" rx="1"/>
+          </g>
+        </svg>
+        <div class="comp-name">RAM</div>
+        <div class="comp-full">Random Access Memory</div>
+        <p class="comp-desc">The computer's short-term memory. Holds data currently in use, allowing the CPU to access it instantly. More RAM = smoother multitasking.</p>
+        <div class="comp-stats">
+          <div class="stat-row">
+            <span class="stat-label">SPEED</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="88"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">CAPACITY</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="70"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">VOLATILE</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="100"></div></div>
+          </div>
+        </div>
+        <button class="comp-expand-btn" data-modal="ram">
+          Explore
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+
+      <!-- Storage Card -->
+      <div class="comp-card" data-comp="storage" data-num="04" data-modal="storage">
+        <svg class="comp-icon" viewBox="0 0 52 52" fill="none">
+          <rect x="8" y="12" width="36" height="28" rx="3" stroke="var(--storage)" stroke-width="1.5"/>
+          <circle cx="26" cy="26" r="9" stroke="var(--storage)" stroke-width="1"/>
+          <circle cx="26" cy="26" r="4" fill="rgba(255,107,53,.2)" stroke="var(--storage)" stroke-width=".8"/>
+          <circle cx="26" cy="26" r="1.5" fill="var(--storage)"/>
+          <line x1="26" y1="17" x2="26" y2="12" stroke="var(--storage)" stroke-width="1"/>
+        </svg>
+        <div class="comp-name">STORAGE</div>
+        <div class="comp-full">SSD / HDD / NVMe</div>
+        <p class="comp-desc">Long-term persistent memory. From spinning hard drives to blazing NVMe SSDs, storage keeps your data safe when the power goes out.</p>
+        <div class="comp-stats">
+          <div class="stat-row">
+            <span class="stat-label">CAPACITY</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="95"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">SPEED</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="72"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">PERSIST</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="100"></div></div>
+          </div>
+        </div>
+        <button class="comp-expand-btn" data-modal="storage">
+          Explore
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+
+      <!-- Network Card -->
+      <div class="comp-card" data-comp="network" data-num="05" data-modal="network">
+        <svg class="comp-icon" viewBox="0 0 52 52" fill="none">
+          <circle cx="26" cy="26" r="10" stroke="var(--net)" stroke-width="1.5"/>
+          <ellipse cx="26" cy="26" rx="5" ry="10" stroke="var(--net)" stroke-width="1"/>
+          <line x1="16" y1="26" x2="36" y2="26" stroke="var(--net)" stroke-width="1"/>
+          <line x1="18" y1="20" x2="34" y2="20" stroke="var(--net)" stroke-width=".7"/>
+          <line x1="18" y1="32" x2="34" y2="32" stroke="var(--net)" stroke-width=".7"/>
+          <!-- Signal arcs -->
+          <path d="M 36 14 Q 44 26 36 38" stroke="var(--net)" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
+          <path d="M 16 14 Q 8 26 16 38" stroke="var(--net)" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
+        </svg>
+        <div class="comp-name">NETWORK</div>
+        <div class="comp-full">NIC / WiFi / Ethernet</div>
+        <p class="comp-desc">The computer's window to the world. Network interfaces translate digital data into signals — connecting your machine to the global internet.</p>
+        <div class="comp-stats">
+          <div class="stat-row">
+            <span class="stat-label">BANDWIDTH</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="86"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">LATENCY</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="60"></div></div>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">REACH</span>
+            <div class="stat-bar-wrap"><div class="stat-bar" data-width="100"></div></div>
+          </div>
+        </div>
+        <button class="comp-expand-btn" data-modal="network">
+          Explore
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+
+    </div><!-- /track -->
+  </div>
+
+  <!-- Scroll hint -->
+  <div class="section-inner" style="padding-top:1rem;">
+    <p style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted);letter-spacing:.15em;text-align:center;">← DRAG TO EXPLORE →</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SECTION 4 — INSIGHT
+═══════════════════════════════════════════ -->
+<section id="insight">
+  <div class="section-inner">
+    <div class="insight-grid">
+
+      <div class="flow-diagram reveal">
+        <div class="flow-title">// REAL-TIME DATA FLOW</div>
+        <svg class="flow-svg" viewBox="0 0 320 340" id="flowSvg">
+          <!-- CPU -->
+          <rect x="115" y="10" width="90" height="44" rx="3" fill="#0a2236" stroke="rgba(0,255,231,.7)" stroke-width="1.5" id="fCpu"/>
+          <text x="160" y="37" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="10" fill="rgba(0,255,231,.9)" font-weight="700">CPU</text>
+
+          <!-- RAM -->
+          <rect x="220" y="110" width="85" height="40" rx="3" fill="#0a2236" stroke="rgba(255,204,0,.7)" stroke-width="1.5" id="fRam"/>
+          <text x="262" y="135" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="10" fill="rgba(255,204,0,.9)" font-weight="700">RAM</text>
+
+          <!-- GPU -->
+          <rect x="15" y="110" width="85" height="40" rx="3" fill="#0a2236" stroke="rgba(191,0,255,.7)" stroke-width="1.5" id="fGpu"/>
+          <text x="57" y="135" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="10" fill="rgba(191,0,255,.9)" font-weight="700">GPU</text>
+
+          <!-- Storage -->
+          <rect x="65" y="220" width="90" height="40" rx="3" fill="#0a2236" stroke="rgba(255,107,53,.7)" stroke-width="1.5" id="fSto"/>
+          <text x="110" y="245" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="9" fill="rgba(255,107,53,.9)" font-weight="700">STORAGE</text>
+
+          <!-- Network -->
+          <rect x="175" y="220" width="90" height="40" rx="3" fill="#0a2236" stroke="rgba(0,201,255,.7)" stroke-width="1.5" id="fNet"/>
+          <text x="220" y="245" text-anchor="middle" font-family="'Orbitron',sans-serif" font-size="9" fill="rgba(0,201,255,.9)" font-weight="700">NETWORK</text>
+
+          <!-- Connections -->
+          <g id="flowLines" stroke-width="1.2" fill="none" opacity=".5">
+            <line id="fl-cpu-ram" x1="205" y1="32" x2="262" y2="110" stroke="rgba(0,255,231,.6)"/>
+            <line id="fl-cpu-gpu" x1="115" y1="32" x2="57" y2="110" stroke="rgba(191,0,255,.6)"/>
+            <line id="fl-cpu-sto" x1="145" y1="54" x2="110" y2="220" stroke="rgba(255,107,53,.6)"/>
+            <line id="fl-cpu-net" x1="175" y1="54" x2="220" y2="220" stroke="rgba(0,201,255,.6)"/>
+            <line id="fl-ram-sto" x1="235" y1="150" x2="155" y2="220" stroke="rgba(255,204,0,.4)"/>
+            <line id="fl-gpu-sto" x1="75" y1="150" x2="100" y2="220" stroke="rgba(191,0,255,.4)"/>
+          </g>
+
+          <!-- Animated data packets -->
+          <g id="dataPackets">
+            <!-- CPU→RAM -->
+            <circle r="5" fill="#00ffe7" opacity=".9">
+              <animateMotion dur="2s" repeatCount="indefinite" id="pktCpuRam">
+                <mpath href="#fpath-cpu-ram"/>
+              </animateMotion>
+            </circle>
+            <!-- CPU→GPU -->
+            <circle r="5" fill="#bf00ff" opacity=".9">
+              <animateMotion dur="2.5s" begin="0.6s" repeatCount="indefinite">
+                <mpath href="#fpath-cpu-gpu"/>
+              </animateMotion>
+            </circle>
+            <!-- RAM→Storage -->
+            <circle r="4" fill="#ffcc00" opacity=".9">
+              <animateMotion dur="3s" begin="1.2s" repeatCount="indefinite">
+                <mpath href="#fpath-ram-sto"/>
+              </animateMotion>
+            </circle>
+            <!-- CPU→Net -->
+            <circle r="4" fill="#00c9ff" opacity=".9">
+              <animateMotion dur="2.8s" begin="1.8s" repeatCount="indefinite">
+                <mpath href="#fpath-cpu-net"/>
+              </animateMotion>
+            </circle>
+          </g>
+
+          <!-- Path defs for animateMotion -->
+          <defs>
+            <path id="fpath-cpu-ram" d="M 205 32 L 262 110"/>
+            <path id="fpath-cpu-gpu" d="M 115 32 L 57 110"/>
+            <path id="fpath-ram-sto" d="M 235 150 L 155 220"/>
+            <path id="fpath-cpu-net" d="M 175 54 L 220 220"/>
+          </defs>
+
+          <!-- Data rate labels -->
+          <text x="160" y="290" text-anchor="middle" font-family="'Share Tech Mono',monospace" font-size="8" fill="rgba(0,255,231,.4)" id="throughputLabel">THROUGHPUT: CALCULATING...</text>
+          <text x="160" y="305" text-anchor="middle" font-family="'Share Tech Mono',monospace" font-size="8" fill="rgba(255,255,255,.2)">PACKETS: ACTIVE</text>
+        </svg>
+
+        <div class="toggle-row">
+          <button class="toggle-btn active" data-flow="all">All Flows</button>
+          <button class="toggle-btn" data-flow="cpu-ram">CPU ↔ RAM</button>
+          <button class="toggle-btn" data-flow="cpu-gpu">CPU ↔ GPU</button>
+          <button class="toggle-btn" data-flow="io">I/O Bus</button>
+        </div>
+
+        <div class="speed-control">
+          <div class="speed-label">
+            <span>Packet Speed</span>
+            <span id="speedVal">1.0×</span>
+          </div>
+          <input type="range" id="speedSlider" min="1" max="5" value="1" step=".5">
+        </div>
+      </div>
+
+      <div class="insight-facts">
+        <p class="section-label reveal">Insight</p>
+        <h2 class="section-title reveal reveal-delay-1">How Data<br>Moves Between<br>Components</h2>
+        <ul class="fact-list reveal reveal-delay-2">
+          <li>
+            <div class="fact-dot" style="background:var(--cpu);box-shadow:var(--glow-cpu);"></div>
+            <span>The CPU sends instructions at up to <strong>128 GB/s</strong> over the memory bus, fetching data from RAM every few nanoseconds to sustain peak performance.</span>
+          </li>
+          <li>
+            <div class="fact-dot" style="background:var(--gpu);box-shadow:var(--glow-gpu);"></div>
+            <span>The CPU offloads rendering workloads to the GPU via <strong>PCIe 5.0</strong>, which provides over 128 GB/s of bidirectional bandwidth.</span>
+          </li>
+          <li>
+            <div class="fact-dot" style="background:var(--ram);box-shadow:var(--glow-ram);"></div>
+            <span>RAM acts as a staging area — data is loaded from storage into RAM first, so the CPU can access it thousands of times faster than from disk.</span>
+          </li>
+          <li>
+            <div class="fact-dot" style="background:var(--storage);box-shadow:var(--glow-sto);"></div>
+            <span>NVMe SSDs communicate via the PCIe lane directly, achieving read speeds of up to <strong>14,000 MB/s</strong> — 30× faster than traditional SATA SSDs.</span>
+          </li>
+          <li>
+            <div class="fact-dot" style="background:var(--net);box-shadow:var(--glow-net);"></div>
+            <span>The Network Interface Card (NIC) translates data packets and manages the TCP/IP stack, routing internet traffic through the system bus.</span>
+          </li>
+        </ul>
+
+        <div class="speed-control reveal reveal-delay-3" style="margin-top:2rem;">
+          <div class="speed-label">
+            <span>Live System Clock</span>
+            <span id="clockDisplay" style="color:var(--cpu);font-size:.8rem;">0 GHz</span>
+          </div>
+          <div style="margin-top:.8rem;height:3px;background:rgba(0,255,231,.1);border-radius:2px;overflow:hidden;">
+            <div id="clockBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--cpu),var(--gpu));border-radius:2px;transition:width .1s;"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SECTION 5 — CONCLUSION
+═══════════════════════════════════════════ -->
+<section id="conclusion">
+  <!-- Glow orbs -->
+  <div class="orb" style="width:700px;height:700px;background:rgba(0,255,231,.035);bottom:-200px;left:50%;transform:translateX(-50%);"></div>
+
+  <div class="section-inner conclusion-inner">
+    <p class="section-label reveal" style="justify-content:center;">Conclusion</p>
+    <h2 class="conclusion-title reveal reveal-delay-1">
+      Billions of Transistors.<br>
+      <span class="line2">One Unified Mind.</span>
+    </h2>
+    <p class="conclusion-body reveal reveal-delay-2">
+      Every keystroke, every pixel rendered, every packet sent — they all trace back to these five fundamental components working in perfect harmony. The computer is humanity's most complex tool, and now you know what lives inside.
+    </p>
+
+    <div class="summary-row reveal reveal-delay-3">
+      <div class="summary-pill" style="--c:var(--cpu);--glow:var(--glow-cpu);">
+        <div class="pill-dot"></div>CPU — The Brain
+      </div>
+      <div class="summary-pill" style="--c:var(--gpu);--glow:var(--glow-gpu);">
+        <div class="pill-dot"></div>GPU — The Eye
+      </div>
+      <div class="summary-pill" style="--c:var(--ram);--glow:var(--glow-ram);">
+        <div class="pill-dot"></div>RAM — Short Memory
+      </div>
+      <div class="summary-pill" style="--c:var(--storage);--glow:var(--glow-sto);">
+        <div class="pill-dot"></div>Storage — Long Memory
+      </div>
+      <div class="summary-pill" style="--c:var(--net);--glow:var(--glow-net);">
+        <div class="pill-dot"></div>Network — The Voice
+      </div>
+    </div>
+
+    <div class="stat-counters reveal reveal-delay-4">
+      <div class="counter-item">
+        <div class="counter-num" data-target="5">0</div>
+        <div class="counter-label">Components</div>
+      </div>
+      <div class="counter-item">
+        <div class="counter-num" data-target="16">0</div>
+        <div class="counter-label">GB/s Avg Bus</div>
+      </div>
+      <div class="counter-item">
+        <div class="counter-num" data-target="5">0</div>
+        <div class="counter-label">GHz CPU Clock</div>
+      </div>
+      <div class="counter-item">
+        <div class="counter-num" data-target="10000">0</div>
+        <div class="counter-label">GPU Cores</div>
+      </div>
+    </div>
+
+    <a href="#hero" class="hero-cta reveal" style="animation:none;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+      Restart Journey
+    </a>
+  </div>
+</section>
+
+<footer>
+  <p>Built for <span>Frontend Odyssey</span> &nbsp;·&nbsp; Interactive Web Experience</p>
+</footer>
+
+<!-- ═══════════════════════════════════════════
+     MODALS (Component Deep Dives)
+═══════════════════════════════════════════ -->
+<div class="card-modal" id="modal-cpu">
+  <div class="modal-inner" style="--mc:var(--cpu);">
+    <button class="modal-close" onclick="closeModal('cpu')">✕</button>
+    <div class="modal-title" style="color:var(--cpu);text-shadow:var(--glow-cpu);">CPU</div>
+    <div class="modal-sub">Central Processing Unit — The System Brain</div>
+    <p class="modal-body">The CPU executes the fetch-decode-execute cycle billions of times per second. Modern CPUs use superscalar pipelines, branch prediction, out-of-order execution, and multi-level caches (L1, L2, L3) to maximize throughput. With up to 64 cores in consumer chips, they handle complex sequential and parallel workloads simultaneously.</p>
+    <div class="modal-facts">
+      <div class="fact-item">
+        <div class="fact-key">Transistors</div>
+        <div class="fact-val" style="color:var(--cpu);">~50 Billion</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Node Size</div>
+        <div class="fact-val" style="color:var(--cpu);">3nm – 5nm</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Max Clock</div>
+        <div class="fact-val" style="color:var(--cpu);">~6.2 GHz</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">L3 Cache</div>
+        <div class="fact-val" style="color:var(--cpu);">Up to 96 MB</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card-modal" id="modal-gpu">
+  <div class="modal-inner">
+    <button class="modal-close" onclick="closeModal('gpu')">✕</button>
+    <div class="modal-title" style="color:var(--gpu);text-shadow:var(--glow-gpu);">GPU</div>
+    <div class="modal-sub">Graphics Processing Unit — The Parallel Powerhouse</div>
+    <p class="modal-body">Unlike the CPU's few powerful cores, the GPU contains thousands of smaller cores optimized for parallel math — perfect for rendering 3D graphics, training neural networks, and scientific simulation. Modern GPUs include dedicated RT cores for ray tracing and Tensor cores for AI acceleration.</p>
+    <div class="modal-facts">
+      <div class="fact-item">
+        <div class="fact-key">CUDA Cores</div>
+        <div class="fact-val" style="color:var(--gpu);">16,384</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">VRAM</div>
+        <div class="fact-val" style="color:var(--gpu);">24 GB GDDR7</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Memory BW</div>
+        <div class="fact-val" style="color:var(--gpu);">1,792 GB/s</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">TFLOPs</div>
+        <div class="fact-val" style="color:var(--gpu);">165 FP32</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card-modal" id="modal-ram">
+  <div class="modal-inner">
+    <button class="modal-close" onclick="closeModal('ram')">✕</button>
+    <div class="modal-title" style="color:var(--ram);text-shadow:var(--glow-ram);">RAM</div>
+    <div class="modal-sub">Random Access Memory — The Workspace</div>
+    <p class="modal-body">RAM is volatile memory — it loses all data when power is cut. It sits between the slow disk and the tiny-but-fast CPU caches, acting as the workspace for active programs. DDR5 memory uses a dual-channel 64-bit bus and can sustain bandwidth of 96+ GB/s per channel.</p>
+    <div class="modal-facts">
+      <div class="fact-item">
+        <div class="fact-key">Speed</div>
+        <div class="fact-val" style="color:var(--ram);">DDR5-8400</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Bandwidth</div>
+        <div class="fact-val" style="color:var(--ram);">96 GB/s</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Latency</div>
+        <div class="fact-val" style="color:var(--ram);">~10ns</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Max Consumer</div>
+        <div class="fact-val" style="color:var(--ram);">192 GB</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card-modal" id="modal-storage">
+  <div class="modal-inner">
+    <button class="modal-close" onclick="closeModal('storage')">✕</button>
+    <div class="modal-title" style="color:var(--storage);text-shadow:var(--glow-sto);">STORAGE</div>
+    <div class="modal-sub">Non-Volatile Memory — The Long-Term Vault</div>
+    <p class="modal-body">Unlike RAM, storage retains data permanently. Modern NVMe SSDs use PCIe Gen 5 lanes to achieve sequential read speeds up to 14,000 MB/s. HDDs use spinning magnetic platters and are slower but cheaper per gigabyte. SSDs use NAND flash cells — stacking 200+ layers in 3D structures.</p>
+    <div class="modal-facts">
+      <div class="fact-item">
+        <div class="fact-key">NVMe Read</div>
+        <div class="fact-val" style="color:var(--storage);">14,000 MB/s</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">HDD Speed</div>
+        <div class="fact-val" style="color:var(--storage);">150 MB/s</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">3D NAND</div>
+        <div class="fact-val" style="color:var(--storage);">200+ Layers</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Max Size</div>
+        <div class="fact-val" style="color:var(--storage);">60 TB SSD</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card-modal" id="modal-network">
+  <div class="modal-inner">
+    <button class="modal-close" onclick="closeModal('network')">✕</button>
+    <div class="modal-title" style="color:var(--net);text-shadow:var(--glow-net);">NETWORK</div>
+    <div class="modal-sub">Network Interface Card — The Global Connector</div>
+    <p class="modal-body">The NIC manages all communication between the computer and external networks. It handles MAC addressing, packet framing, and protocol translation. WiFi 7 (802.11be) can achieve throughput up to 46 Gbps using Multi-Link Operation and 320 MHz channels. Modern NICs offload TCP/IP stack processing from the CPU.</p>
+    <div class="modal-facts">
+      <div class="fact-item">
+        <div class="fact-key">WiFi 7 Speed</div>
+        <div class="fact-val" style="color:var(--net);">46 Gbps</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Ethernet</div>
+        <div class="fact-val" style="color:var(--net);">100 GbE</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Protocol</div>
+        <div class="fact-val" style="color:var(--net);">TCP/IP v6</div>
+      </div>
+      <div class="fact-item">
+        <div class="fact-key">Latency</div>
+        <div class="fact-val" style="color:var(--net);">&lt;1ms LAN</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════ -->
+<script>
+/* ─── CURSOR ─── */
+const dot  = document.getElementById('cursor-dot');
+const ring = document.getElementById('cursor-ring');
+let mx = 0, my = 0, rx = 0, ry = 0;
+
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+;(function animCursor() {
+  rx += (mx - rx) * .12;
+  ry += (my - ry) * .12;
+  dot.style.left  = mx + 'px';
+  dot.style.top   = my + 'px';
+  ring.style.left = rx + 'px';
+  ring.style.top  = ry + 'px';
+  requestAnimationFrame(animCursor);
+})();
+
+document.querySelectorAll('a, button, .comp-card, .fact-list li, .summary-pill, input[type=range]').forEach(el => {
+  el.addEventListener('mouseenter', () => document.body.classList.add('hover-active'));
+  el.addEventListener('mouseleave', () => document.body.classList.remove('hover-active'));
+});
+
+/* ─── LOADER ─── */
+const msgs = [
+  'Mounting hardware interfaces...',
+  'Initializing memory controller...',
+  'Loading GPU shaders...',
+  'Establishing network stack...',
+  'Booting experience...'
+];
+const bar = document.getElementById('loaderBar');
+const status = document.getElementById('loaderStatus');
+let pct = 0;
+const loaderInterval = setInterval(() => {
+  pct += (100 - pct) * .035 + .4;
+  bar.style.width = Math.min(pct, 98) + '%';
+  status.textContent = msgs[Math.floor((pct / 100) * msgs.length)] || msgs[msgs.length - 1];
+  if (pct >= 98) {
+    clearInterval(loaderInterval);
+    bar.style.width = '100%';
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('hidden');
+    }, 500);
+  }
+}, 50);
+
+/* ─── CIRCUIT NODES (hero) ─── */
+const nodeContainer = document.getElementById('circuitNodes');
+for (let i = 0; i < 20; i++) {
+  const n = document.createElement('div');
+  n.className = 'node';
+  n.style.left = Math.random() * 100 + '%';
+  n.style.top  = Math.random() * 100 + '%';
+  n.style.width = n.style.height = (Math.random() * 5 + 3) + 'px';
+  const dur = 3 + Math.random() * 5;
+  const del = Math.random() * 4;
+  n.style.animation = `nodeFloat ${dur}s ${del}s ease-in-out infinite`;
+  const hue = Math.random() > .5 ? 'var(--cpu)' : 'var(--gpu)';
+  n.style.background = hue;
+  n.style.boxShadow = hue === 'var(--cpu)' ? 'var(--glow-cpu)' : 'var(--glow-gpu)';
+  nodeContainer.appendChild(n);
+}
+
+/* ─── NAV SCROLL PROGRESS ─── */
+const navProgress = document.getElementById('navProgress');
+window.addEventListener('scroll', () => {
+  const pct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight) * 100;
+  navProgress.style.width = pct + '%';
+});
+
+/* ─── REVEAL ON SCROLL (Intersection Observer) ─── */
+const revealEls = document.querySelectorAll('.reveal');
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      // Animate stat bars
+      e.target.querySelectorAll('.stat-bar[data-width]').forEach(bar => {
+        setTimeout(() => { bar.style.width = bar.dataset.width + '%'; }, 300);
+      });
+    }
+  });
+}, { threshold: 0.12 });
+revealEls.forEach(el => revealObs.observe(el));
+
+/* Animate stat bars in view */
+const barObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('.stat-bar[data-width]').forEach(bar => {
+        setTimeout(() => { bar.style.width = bar.dataset.width + '%'; }, 400);
+      });
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('.comp-card').forEach(c => barObs.observe(c));
+
+/* ─── COUNTER ANIMATION ─── */
+const counterObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const target = parseInt(e.target.dataset.target);
+      let current = 0;
+      const step = target / 60;
+      const interval = setInterval(() => {
+        current = Math.min(current + step, target);
+        e.target.textContent = Math.floor(current).toLocaleString();
+        if (current >= target) {
+          e.target.textContent = target.toLocaleString();
+          clearInterval(interval);
+        }
+      }, 20);
+      counterObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+document.querySelectorAll('.counter-num[data-target]').forEach(n => counterObs.observe(n));
+
+/* ─── COMPONENT MODALS ─── */
+function openModal(id) {
+  document.getElementById('modal-' + id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById('modal-' + id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.querySelectorAll('[data-modal]').forEach(el => {
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openModal(el.dataset.modal);
+  });
+});
+
+document.querySelectorAll('.card-modal').forEach(m => {
+  m.addEventListener('click', (e) => {
+    if (e.target === m) {
+      const id = m.id.replace('modal-', '');
+      closeModal(id);
+    }
+  });
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.card-modal.open').forEach(m => {
+      closeModal(m.id.replace('modal-', ''));
+    });
+  }
+});
+
+/* ─── FLOW DIAGRAM TOGGLES ─── */
+const flowMap = {
+  'all':     ['fl-cpu-ram','fl-cpu-gpu','fl-cpu-sto','fl-cpu-net','fl-ram-sto','fl-gpu-sto'],
+  'cpu-ram': ['fl-cpu-ram','fl-ram-sto'],
+  'cpu-gpu': ['fl-cpu-gpu','fl-gpu-sto'],
+  'io':      ['fl-cpu-sto','fl-cpu-net']
+};
+
+const throughputs = {
+  'all':     '128 GB/s TOTAL',
+  'cpu-ram': '96 GB/s DDR5',
+  'cpu-gpu': '64 GB/s PCIe 5',
+  'io':      '14 GB/s NVMe'
+};
+
+document.querySelectorAll('.toggle-btn[data-flow]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.toggle-btn[data-flow]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const key = btn.dataset.flow;
+    const active = flowMap[key];
+    document.querySelectorAll('#flowLines line').forEach(l => {
+      l.style.opacity = active.includes(l.id) ? '.9' : '.08';
+    });
+    document.getElementById('throughputLabel').textContent = 'THROUGHPUT: ' + (throughputs[key] || '...');
+  });
+});
+
+/* ─── SPEED SLIDER ─── */
+const speedSlider = document.getElementById('speedSlider');
+const speedVal = document.getElementById('speedVal');
+speedSlider.addEventListener('input', () => {
+  const v = parseFloat(speedSlider.value);
+  speedVal.textContent = v.toFixed(1) + '×';
+  document.querySelectorAll('animateMotion').forEach(am => {
+    const base = parseFloat(am.getAttribute('dur')) || 2;
+    am.setAttribute('dur', (base / v) + 's');
+  });
+});
+
+/* ─── SIMULATED CPU CLOCK BAR ─── */
+let clockFrame = 0;
+function tickClock() {
+  clockFrame++;
+  const ghz = (3.2 + Math.sin(clockFrame * 0.04) * 1.4 + Math.random() * 0.4).toFixed(1);
+  const pct = ((parseFloat(ghz) - 1) / 6) * 100;
+  document.getElementById('clockDisplay').textContent = ghz + ' GHz';
+  document.getElementById('clockBar').style.width = pct + '%';
+  requestAnimationFrame(tickClock);
+}
+tickClock();
+
+/* ─── PARALLAX HERO GRID ─── */
+window.addEventListener('scroll', () => {
+  const sy = window.scrollY;
+  const grid = document.querySelector('.grid-bg');
+  if (grid) grid.style.transform = `translateY(${sy * 0.3}px)`;
+  const nodes = document.querySelector('.circuit-nodes');
+  if (nodes) nodes.style.transform = `translateY(${sy * 0.15}px)`;
+});
+
+/* ─── HORIZONTAL DRAG SCROLL on component track ─── */
+const track = document.getElementById('compTrack');
+const trackWrap = track.parentElement;
+let isDragging = false, startX, scrollLeft;
+
+trackWrap.addEventListener('mousedown', e => {
+  isDragging = true;
+  startX = e.pageX - trackWrap.offsetLeft;
+  scrollLeft = trackWrap.scrollLeft;
+  trackWrap.style.cursor = 'grabbing';
+});
+trackWrap.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  e.preventDefault();
+  const x = e.pageX - trackWrap.offsetLeft;
+  const walk = (x - startX) * 1.5;
+  trackWrap.scrollLeft = scrollLeft - walk;
+});
+['mouseup','mouseleave'].forEach(ev => trackWrap.addEventListener(ev, () => {
+  isDragging = false;
+  trackWrap.style.cursor = '';
+}));
+
+/* ─── STICKY NAV BACKGROUND ─── */
+const mainNav = document.getElementById('mainNav');
+window.addEventListener('scroll', () => {
+  mainNav.style.background = window.scrollY > 60
+    ? 'rgba(3,11,20,.97)'
+    : 'rgba(3,11,20,.8)';
+});
+</script>
+</body>
+</html>
